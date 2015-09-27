@@ -93,6 +93,14 @@ beta_hat.comparison
 # 1) Assuming the error term, u, is normally distributed u=N(0, sigma^2), then E(y|x)=exp(x'b)exp(0.5 s^2)
 # find exact number in levels (in Dollar) not in log Dollars
 
+###III GENERATE WAGE PREDICTION IN LEVELS
+lm1 <- lm(WAGE ~ SCHOOL + EXPER + UNION + MAR + BLACK, data=Males)
+lm1
+lnyhat = predict(lm1, data.frame(Males))
+lnyhat    
+summary(lnyhat)##### This is like lnyhay in STATA. Same results.
+
+
 # "old way"
 lyhat_mean<-mean(fitted.values(lm1))
 lyhat_sd<-sd(fitted.values(lm1))
