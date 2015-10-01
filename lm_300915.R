@@ -48,7 +48,7 @@ waldtest(fs, fn)$F[2]      #### As in STATA ###
 ### Run IV regression where experience and schooling are instrumented with age and mother and father education
 # Generate age762 square
 age762<- Schooling$age76^2
-summary(age762sq)               ### Output ok!
+summary(age762)               ### Output ok!
 
 
 ### Run IV regression where experience and schooling are instrumented with age and mother and father education
