@@ -1,0 +1,191 @@
+#panel_091215
+
+#LOAD REQUIRED PACKAGES
+library(foreign)
+library(haven) # assuming stata13 files
+library(checkpoint)
+library(ProjectTemplate)
+library(explainr)
+library(magrittr)
+library(psych)
+library(MASS)
+library(arm)
+library(broom)
+library(AER)
+library(gmm) # Generalized Method of Moments and Generalized Empirical Likelihood
+library(aod)
+library(ggplot2)
+library(RColorBrewer)
+library(reshape)
+library(boot)
+library(memisc)
+library(stargazer)
+library(plm)
+library(wfe)
+library(lmtest)  # for waldtest()
+library(car)
+library(reshape2)
+library(data.table)
+library(sandwich)
+
+# set wd
+setwd("~/studium/TUT/econometric (phd) - TES9130/R/econometrics - TES9130/econometrics-TES9130")
+
+#UPLOAD THE DATASET
+labour <-read_dta("Labour.dta")
+
+#BROWSE
+View(labour)  
+dim(labour)
+
+# discriptive statistics
+summary(labour)
+str(labour)
+
+# Visualize dataset
+pair(labour)
+
+# DECLARE THE DATASET AS PANEL-DATA
+labour <- plm.data(labour, index=c("id","year"))
+head(labour)
+
+
+# (1) POOLED OLS REGRESSION
+# Pooled OLS estimator
+mod1 <- plm(lnhr ~ lnwg + kids + ageh + agesq + disab, data=labour, index=c("id","year"), model= "pooling")
+#options(digits = 6)  # for more exact comparison with Stata's output but nothing changed
+coeftest(mod1)
+summary(mod1)          
+
+
+# WRONG WHITE HETEROSKEDASTICITY-CONSISTENT STANDARD ERRORS 
+mod2 <- plm(lnhr ~ lnwg + kids + ageh + agesq + disab, data=labour, index=c("id","year"), model= "pooling")
+#coeftest(mod2, method=c("white1"), vcov = vcovHC(mod2, type="HC0"))    
+coeftest(mod2, vcov. = vcovHC(mod2))
+
+
+
+# CORRECT PANEL ROBUST STANDARD ERRORS 
+G <- length(unique(labour$id))
+N <- length(labour$id)
+dfa <- (G/(G - 1)) * (N - 1)/mod1$df.residual
+# display with cluster VCE and df-adjustment
+mod3 <- plm(lnhr ~ lnwg + kids + ageh + agesq + disab, data=labour, model= "pooling")
+firm_c_vcov <- dfa * vcovHC(mod3, type = "HC0", cluster = "group", adjust = T)
+coeftest(mod3, vcov = firm_c_vcov)                
+
+
+# STANDARD ERROR USING IID ERRORS (make table)
+stargazer(mod1, mod2, mod3, title="Panel regressions, clustered SEs", type="text", 
+          column.labels=c("Pooled OLS", "White", "Cluster"), df=FALSE, digits=4)
+## Set the regressions above and the lines above for table works!
+
+
+
+# CORRECT PANEL BOOTSTRAP STANDARD ERRORS       
+
+
+
+# SCATTER PLOT - OVERALL PLOT OF DATA WITH LOWESS LOCAL REGRESSION  
+library(ggplot2)
+ggplot(data=labour, aes(x=lnwg, y=lnhr)) +
+  geom_point(pch=17, color="blue", size=2) +
+  geom_smooth(method="lm", color="red", linetype=2) +
+  labs(title="Pooled Overall Regression", x="Log hourly wage", y="Log annual hours")   ## THis plot is ok.
+save.image("d:/pooled regression.RData")
+
+
+
+# Betweeen plot of data with lowess local regression line
+remove(mod1, mod2, mod3, labour, dfa, G, N, firm_c_vcov)
+# read in data
+labour <-read_dta("Labour.dta")
+
+# Declare the data as panel-data
+labour <- plm.data(labour, index=c("id","year"))
+head(labour)
+
+
+
+# Between effects
+re <- plm(lnhr ~ lnwg + kids + ageh + agesq + disab, data=labour, index=c("id","year"),  model= "random")
+summary(re)
+library(ggplot2)
+ggplot(data=labour, aes(x=lnwg, y=lnhr)) +
+  geom_point(pch=17, color="blue", size=2) +
+  geom_smooth(method="lm", color="red", linetype=2) +
+  labs(title="Between", x="Log hourly wage", y="Log annual hours")   
+save.image("d:/between.RData")
+
+
+
+
+# Within plot of data with lowess local regression line
+remove(re)
+# read in data
+labour <-read_dta("Labour.dta")
+
+# Declare the data as panel-data
+labour <- plm.data(labour, index=c("id","year"))
+head(labour)
+
+# Fixed effect or within estimator
+fixed <- plm(lnhr ~ lnwg + kids + ageh + agesq + disab, data=labour, model= "within")
+summary(fixed)    
+library(ggplot2)
+ggplot(data=labour, aes(x=lnwg, y=lnhr)) +
+  geom_point(pch=17, color="blue", size=2) +
+  geom_smooth(method="lm", color="red", linetype=2) +
+  labs(title="Within", x="Log hourly wage", y="Log annual hours")   
+save.image("d:/between.RData")
+
+
+# The following only works if each observation is (i,t) and within i the data are ordered by t
+remove(fixed, dfa,G,N, firm_c_vcov)
+
+# read in data
+labour <-read_dta("Labour.dta")
+
+## Declare the data as panel-data
+labour <- plm.data(labour, index=c("id","year"))
+head(labour)
+
+
+## Generate dvariable as difference between years. An alternative approach to taking advantage of the 
+# full panel is to run the regression in first differences. That is, we create new variables that represent the year-to-year change in each variable
+mod4 <- plm(lnhr ~ lnwg + kids + ageh + agesq + disab, data=labour, effect="individual", model= "fd")
+
+# It generates in wrong way the covariates. Not dlnhr, dlnwg but dyear1 and so on. 
+
+# Scatter plot 
+library(ggplot2)
+ggplot(data=labour, aes(x=dlnhr, y=dlwg)) +
+  geom_point(pch=17, color="blue", size=2) +
+  geom_smooth(method="lm", color="red", linetype=2) +
+  labs(title="First Difference", x="dlnwg", y="dlnhr")     
+save.image("d:/fd.RData")
+
+
+
+## Combine all 4 plots together
+
+
+#The following only works if each observation is (i,t) and within i the data are ordered by t
+remove(labour, mod4)
+
+# //**** COMPARE PANEL DATA ESTIMATORS *** ///
+# read in data
+labour <-read_dta("Labour.dta")
+
+## Declare the data as panel-data
+labour <- plm.data(labour, index=c("id","year"))
+head(labour)
+
+
+
+# Correct panel robust standard errors
+
+# Usual standard errors assume iid error
+
+# STATA has no option for correct panel robust standard errors, bootstrapped s.e. must be calculated
+
